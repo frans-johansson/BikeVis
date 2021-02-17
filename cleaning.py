@@ -20,8 +20,7 @@ def clean_data(file_path: str, destination='data/clean_data.csv') -> pd.DataFram
     '''
     df = pd.read_csv(file_path)
 
-    time_format = '%Y-%m-%d %H:%M:%S'
-    df['timestamp'] = pd.to_datetime(df['timestamp'], format=time_format)
+    df['timestamp'] = format_datetimes(df)
 
     df['weather_code'] = df['weather_code'].astype(int)
     df['is_holiday'] = df['is_holiday'].astype(int)
@@ -34,6 +33,21 @@ def clean_data(file_path: str, destination='data/clean_data.csv') -> pd.DataFram
     df.to_csv(destination, index=False)
     return df
 
+def format_datetimes(df: pd.DataFrame, column='timestamp', format='%Y-%m-%d %H:%M:%S') -> pd.Series:
+    '''
+    Formats a column from a given DataFrame from datetime strings to DateTime objects.
+
+    ## Parameters:
+
+    * `df`: The DataFrame to format
+    * `column`: The name of the column with datetime strings
+    * `format`: Format string for how to parse the datetime strings
+
+    ## Returns:
+
+    A Series with the parsed DateTime objects.
+    '''
+    return pd.to_datetime(df['timestamp'], format=format)
 
 if __name__ == '__main__':
     try:
