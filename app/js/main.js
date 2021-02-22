@@ -34,9 +34,10 @@ const main = async () => {
         mean_humidity: +d.mean_humidity,
         mean_wind_speed: +d.mean_wind_speed
     }))
-    
-    make_timeline_overview(clean_data, day_data, week_data)
-    make_day_filter(clean_data)
+
+    update_focus = make_timeline_focus(week_data, day_data)
+    make_timeline_overview(week_data, update_focus)
+    // make_day_filter(clean_data)
 }
 
 main()
