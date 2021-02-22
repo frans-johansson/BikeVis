@@ -1,4 +1,7 @@
-const make_timeline_overview = (data) => {
+const make_timeline_overview = (clean_data, day_data, week_data) => {
+    
+    console.log(week_data)
+
     let svg = d3.select('#timeline-overview')
         .append('svg')
 
@@ -6,10 +9,10 @@ const make_timeline_overview = (data) => {
     const margin = ({ top: 20, right: 20, bottom: 50, left: 50 })
 
     const x = d3.scaleTime()
-        .domain(d3.extent(data, d => d.timestamp))
+        .domain(d3.extent(week_data, d => d.timestamp))
         .range([margin.left, width - margin.right])
     const y = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.count)])
+        .domain([0, d3.max(week_data, d => d.sum_count)])
         .range([height - margin.bottom, margin.top])
 
     const xAxis = g => g
@@ -18,53 +21,21 @@ const make_timeline_overview = (data) => {
     const yAxis = g => g
         .attr('transform', `translate(${margin.left},0)`)
         .call(d3.axisLeft(y))
+    
     const line = d3.line()
         .x(d => x(d.timestamp))
-        .y(d => y(d.count))
+        .y(d => y(d.sum_count))  
 
     svg.append('g')
         .call(xAxis);
     svg.append('g')
         .call(yAxis);
     svg.append("path")
-        .datum(data)
+        .datum(week_data)
         .attr("fill", "none")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 1.5)
         .attr("stroke-linejoin", "round")
         .attr("stroke-linecap", "round")
         .attr("d", line);
-
-    // HERE WE GO WITH DATA IN JS woo
-    const date_data = data.map(d => ({
-        ...d,
-        date: `${d.timestamp.getYear()}/${d.timestamp.getMonth()}/${d.timestamp.getDate()}`
-    }))
-
-    let grouped_data = d3.group(date_data,
-        d => d.date
-    )
-    // ({ timestamp }) => timestamp.getYear(),
-    // ({ timestamp }) => timestamp.getMonth(),
-    // ({ timestamp }) => timestamp.getDate()
-
-    count_days = grouped_data.forEach((month) => {
-        // console.log(month)
-    })
-    print_data(data)
-    print_data(Array.from(grouped_data))
-    // print_data(days)
-}
-
-const slice_days = (data) => {
-    let days = [];
-    let i = 0;
-    while (i < data.length) {
-        days.push(data.slice(i, i += 24))
-    }
-    return days
-}
-
-const print_data = (data) => {
-    console.log(data)
 }
