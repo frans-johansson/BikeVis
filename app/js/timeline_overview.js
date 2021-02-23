@@ -1,4 +1,4 @@
-const make_timeline_overview = (agg_data, update_focus) => {
+const make_timeline_overview = (agg_data, brushed) => {
     let svg = d3.select('#timeline-overview')
         .append('svg')
 
@@ -40,7 +40,7 @@ const make_timeline_overview = (agg_data, update_focus) => {
         .extent([[margin.left, margin.top - 0.5], [width-margin.right, height-margin.bottom]])
         .on('brush', ({selection}) => {
             let s = selection || x
-            update_focus(s.map(x.invert, x))
+            brushed(s.map(x.invert, x))
         })
 
     svg.append('g')
