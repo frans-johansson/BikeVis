@@ -24,6 +24,9 @@ const make_day_view = (data) => {
     const y = d3.scaleLinear()
         .domain([0, d3.max(hourData, d => d.count)])
         .range([height - margin.bottom, margin.top])
+    const op = d3.scaleLinear()
+        .domain([0, hourData.length])
+        .range([0.2, 0.05])
 
     const xAxis = g => g
         .attr('transform', `translate(0,${height - margin.bottom})`)
@@ -43,12 +46,16 @@ const make_day_view = (data) => {
             
     const drawDots = (data) => {
         dots.selectAll("circle")
-            .data(data)
-            .join("circle")
-            .attr("opacity", "0.1")
-            .attr("r", 3.5)
-            .attr("cx", d => x(d.hour))
-            .attr("cy", d => y(d.count))
+            .data(data, (d) => d.timestamp)
+            .join(
+                enter => enter.append('circle')
+                            .attr("opacity", `${op(data.length)}`)
+                            .attr("r", 3.5)
+                            .attr("cx", d => x(d.hour))
+                            .attr("cy", d => y(d.count)),
+                update => update.attr("opacity", `${op(data.length)}`),
+                exit => exit.remove()
+            )
     }
     drawDots(hourData)
 
