@@ -57,9 +57,118 @@ const make_day_view = (data) => {
                 exit => exit.remove()
             )
     }
-    drawDots(hourData)
 
-    // const line = d3.line()
+
+
+    let filter = {
+        weekday: 1, weekend: 1, holiday: 1,
+        // weather codes: 1=clear, 2=few clouds, 3=broken clouds, 4=cloudy, 7=rain, 10=rain with thunder, 26=snowfall
+        clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
+    }
+
+    const apply_filter = (data, filter) => {
+
+        return data.filter( d => (d.is_weekday == filter.weekday || d.is_weekend == filter.weekend || d.is_holiday == filter.holiday)
+                                        && 
+                                        (d.weather_code == filter.clear || d.weather_code == filter.cloud1 || d.weather_code == filter.cloud2
+                                        || d.weather_code == filter.cloud3 || d.weather_code == filter.rain || d.weather_code == filter.thunder
+                                        || d.weather_code == filter.snow))
+    }
+
+    const update_filter = () => {
+        if(d3.select('#weekday').property("checked")){
+            filter.weekday = 1
+        } else {
+            filter.weekday = -1	
+        }
+        if(d3.select('#weekend').property("checked")){
+            filter.weekend = 1
+        } else {
+            filter.weekend = -1
+        }
+        if(d3.select('#holiday').property("checked")){
+            filter.holiday = 1
+        } else {
+            filter.holiday = -1
+        }
+        if(d3.select('#clear').property("checked")){
+            filter.clear = 1
+        } else {
+            filter.clear = -1
+        }
+        if(d3.select('#cloud1').property("checked")){
+            filter.cloud1 = 2
+        } else {
+            filter.cloud1 = -1
+        }
+        if(d3.select('#cloud2').property("checked")){
+            filter.cloud2 = 3
+        } else {
+            filter.cloud2 = -1
+        }
+        if(d3.select('#cloud3').property("checked")){
+            filter.cloud3 = 4
+        } else {
+            filter.cloud3 = -1
+        }
+        if(d3.select('#rain').property("checked")){
+            filter.rain = 7
+        } else {
+            filter.rain = -1
+        }
+        if(d3.select('#thunder').property("checked")){
+            filter.thunder = 10
+        } else {
+            filter.thunder = -1
+        }
+        if(d3.select('#snow').property("checked")){
+            filter.snow = 26
+        } else {
+            filter.snow = -1
+        }
+
+        drawDots(apply_filter(filteredData, filter))
+    }
+
+    // Updates the filter when a checkbox is changed
+    d3.selectAll('.filter')
+                    .on('change', update_filter)
+
+
+    return [
+        ([xMin, xMax]) => {
+            
+            filteredData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
+            filteredData = apply_filter(filteredData, filter)
+            
+            
+            drawDots(filteredData)
+            // console.log(`Update day view with: [${xMin}, ${xMax}]`)
+        },
+        (filter) => {
+            console.log(`Update day filter with: ${filter}`)
+        }
+    ]
+}
+
+
+
+
+
+
+
+// const mean_hourly_data = (filtered_data) => {
+
+//     const format_hour = d3.timeFormat("%H")
+//     // let mean_data = []
+//     let grouped_data = d3.group(filtered_data, d => format_hour(d.timestamp))
+
+//     console.log(grouped_data)
+
+
+
+
+// const line = d3.line()
     //     .x(d => x(d.timestamp))
     //     .y(d => y(d.count))  
 
@@ -76,31 +185,7 @@ const make_day_view = (data) => {
     //     .attr("stroke-linecap", "round")
     //     .attr("d", line);
 
-    return [
-        ([xMin, xMax]) => {
-            filteredData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
-            drawDots(filteredData)
-            // console.log(`Update day view with: [${xMin}, ${xMax}]`)
-        },
-        (filter) => {
-            console.log(`Update day filter with: ${filter}`)
-        }
-    ]
-}
 
-const apply_filter = (data) => {
-
-    let filtered_data = data
-    return filtered_data
-}
-
-const mean_hourly_data = (filtered_data) => {
-
-    const format_hour = d3.timeFormat("%H")
-    // let mean_data = []
-    let grouped_data = d3.group(filtered_data, d => format_hour(d.timestamp))
-
-    console.log(grouped_data)
 
     // grouped_data.forEach((hour_array, i) => {
 
@@ -116,4 +201,4 @@ const mean_hourly_data = (filtered_data) => {
     //     mean_data[+i] = temp
     // })
     // return mean_data
-}
+// }

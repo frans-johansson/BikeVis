@@ -13,6 +13,7 @@ const loadData = async () => {
         humidity: +d.humidity,
         weather_code: +d.weather_code,
         season: +d.season,
+        is_weekday: +d.is_weekend-1*-1,
         is_weekend: +d.is_weekend,
         is_holiday: +d.is_holiday,
     }))
