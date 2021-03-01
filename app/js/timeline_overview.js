@@ -18,11 +18,11 @@ const make_timeline_overview = (agg_data, brushed) => {
     // const yAxis = g => g
     //     .attr('transform', `translate(${margin.left},0)`)
     //     .call(d3.axisLeft(y))
-    
+
     const line = d3.line()
         .x(d => x(d.timestamp))
-        .y(d => y(d.sum_count))  
-    
+        .y(d => y(d.sum_count))
+
     svg.append('g')
         .call(xAxis);
     // svg.append('g')
@@ -37,13 +37,55 @@ const make_timeline_overview = (agg_data, brushed) => {
         .attr("d", line);
 
     const brush = d3.brushX()
-        .extent([[margin.left, margin.top - 0.5], [width-margin.right, height-margin.bottom]])
-        .on('brush', ({selection}) => {
+        .extent([[margin.left, margin.top - 0.5], [width - margin.right, height - margin.bottom]])
+        .on('brush', ({ selection }) => {
             let s = selection || x
             brushed(s.map(x.invert, x))
         })
 
-    svg.append('g')
+    const brushSelection = svg.append('g')
         .call(brush)
         .call(brush.move, x.range())
+
+    // Handle outlier notifications
+    const outlierNotifications = svg.append('g')
+        .attr('class', 'outlier-notifications')
+        .attr('fill', 'red')
+        .attr('pointer-events', 'all')
+        .attr('transform', `translate(0,${height - margin.bottom})`)
+
+    const drawOutlierNotifications = (threshold) => {
+        const outliers = agg_data.filter(d => d.pearson < threshold)
+        outlierNotifications.selectAll('circle').data(outliers)
+            .join(
+                enter => enter.append('circle')
+                    .attr('class', 'outlierDot')
+                    .attr('r', 4)
+                    .attr('cx', d => x(d.timestamp))
+                    .attr('cy', 0)
+                    .on('mouseover', ({ currentTarget }) => {
+                        // I like hover effects :)
+                        d3.select(currentTarget).attr('r', 8)
+                    })
+                    .on('mouseout', ({ currentTarget }) => {
+                        // Not sure if this is the cleanest way of doing it,
+                        // but the hover effect has to be reset 
+                        d3.select(currentTarget).attr('r', 4)
+                    })
+                    .on('click', (e, d) => {
+                        // Set the brush range on click
+                        let startOfWeek = d.timestamp
+                        let endOfWeek = new Date(startOfWeek)
+                        endOfWeek.setDate(startOfWeek.getDate() + 7)
+                        brushSelection.call(brush.move, [x(startOfWeek), x(endOfWeek)])
+                    })
+            )
+    }
+    // DOM handle for slider
+    const outlierSlider = d3.select('#outlier-sensitivity')
+    // Initial draw
+    drawOutlierNotifications(outlierSlider.node().value)
+    // Redraw on input change
+    outlierSlider
+        .on('input', ({ target }) => drawOutlierNotifications(target.value))
 }

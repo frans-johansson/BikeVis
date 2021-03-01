@@ -35,7 +35,8 @@ const loadData = async () => {
         mean_count: +d.mean_count,
         mean_temp: +d.mean_temp,
         mean_humidity: +d.mean_humidity,
-        mean_wind_speed: +d.mean_wind_speed
+        mean_wind_speed: +d.mean_wind_speed,
+        pearson: +d.pearson
     }))
 
     return {
