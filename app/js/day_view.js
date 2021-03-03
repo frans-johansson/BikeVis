@@ -1,7 +1,7 @@
 const make_day_view = (data) => {
     const hourOf = d3.timeFormat("%H")
     const hourData = data.map(d => ({ ...d, hour: hourOf(d.timestamp) }))
-
+    let focusedData = []
 
     // ******************* OLD CODE WITH DOTS *********************
 
@@ -56,8 +56,6 @@ const make_day_view = (data) => {
     // }
     // ***************************************************************
 
-    // TODO: Make the box plot remove old elements when updated
-
     // Compute the data needed for the box plot
     const compute_summary = (data) => {
         return d3.rollups(data, v => {
@@ -69,7 +67,14 @@ const make_day_view = (data) => {
             maxVertLine = q3 + 1.5 * interQuantileRange
             minCount = d3.min(v.map( h => { return h.count}))
             maxCount = d3.max(v.map( h => { return h.count}))
-            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine, maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount})
+            outliers = []
+            
+            if(minCount < minVertLine || maxCount > maxVertLine){
+                outliers = v.filter( d => d.count < minVertLine || d.count > maxVertLine)
+            }
+            
+            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine,
+                    maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount, outliers: outliers})
             }, d => d.hour).sort(d3.ascending)
     }
     
@@ -109,7 +114,7 @@ const make_day_view = (data) => {
 
     // Function that draws the boxes
     let boxWidth = width/48
-    const drawBoxes = (data) => {
+    const draw_boxes = (data) => {
         // Vertical line
         svg.selectAll(".vertLine")
         .data(data)
@@ -232,41 +237,100 @@ const make_day_view = (data) => {
                                 return(y(d[1].maxVertLine))})
         )
     }
+
+    // Function that draws the outliers as dots
+    const dots = svg.append("g")
+        .attr("fill", "red")
+        .attr("pointer-events", "all")
+
+    const draw_outliers = data => {
+        
+        // console.log(data)
+        dots.selectAll(".outlier")
+            .data(data)
+            .join(
+                enter => enter.append("circle")
+                            .attr("class", "outlier")
+                            .attr("opacity", `${op(data.length)}`)
+                            .attr("r", 3.5)
+                            .attr("cx", d => x(d.hour))
+                            .attr("cy", d => y(d.count)),
+                update => update.attr("opacity", `${op(data.length)}`),
+                exit => exit.remove()
+            )
+        
+    }
     
     // The filter object that determines which data that is rendered and is updated by the checkboxes
     let filter = {
         weekday: 1, weekend: 1, holiday: 1,
         clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
     }
+    const toWeatherCode = {
+        clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
+    }
+    // let summary = []
+    // let focusedData = []
 
     // Takes a dataset and a filter objects filters the data with the filter. This function can take already filtered data and apply another filter to it.
-    const apply_filter = (data, filter) => {
-        return data.filter( d => (d.is_weekday == filter.weekday || d.is_weekend == filter.weekend || d.is_holiday == filter.holiday)
-                                        && 
-                                        (d.weather_code == filter.clear || d.weather_code == filter.cloud1 || d.weather_code == filter.cloud2
-                                        || d.weather_code == filter.cloud3 || d.weather_code == filter.rain || d.weather_code == filter.thunder
-                                        || d.weather_code == filter.snow))
+    const apply_filter = (data) => {
+        const weatherBoxes = d3.selectAll('.weather').nodes()
+        const weathers = weatherBoxes.filter(w => w.checked).map(w => toWeatherCode[w.id])
+
+        const dayPropBoxes = d3.selectAll('.dayProp').nodes()
+        const dayProps = dayPropBoxes.map(d => d.checked)
+
+        console.log(dayProps)
+        console.log(`Holiday: ${data[0].is_holiday  && dayProps[0]}`)
+        console.log(`Weekend: ${data[0].is_weekend  && dayProps[1]}`)
+        console.log(`Weekday: ${!data[0].is_weekend && dayProps[2]}`)
+        // console.log(data[0])
+        // console.log(weathers)
+        // console.log(`Check if includes works: ${weathers.includes(data[0].weather_code)}`)
+        // weathers.includes(d.weather_code)
+
+        return data.filter(d => weathers.includes(d.weather_code)    &&
+                                ((d.is_holiday  && dayProps[2]) ||
+                                 (d.is_weekend  && dayProps[1]) ||
+                                 (!d.is_weekend && dayProps[0])))
+
+        // return data.filter( d => (d.is_weekend != filter.weekend || do.is_weekend == filter.weekend || d.is_holiday == filter.holiday)
+        //                                 && 
+        //                                 (d.weather_code == filter.clear || d.weather_code == filter.cloud1 || d.weather_code == filter.cloud2
+        //                                 || d.weather_code == filter.cloud3 || d.weather_code == filter.rain || d.weather_code == filter.thunder
+        //                                 || d.weather_code == filter.snow))
     }
 
     // Updates the filter when a checkbox is changed
     d3.selectAll(".filter")
-        .on("change", d => {
-            
+        .on("change", e => {
+            // console.log(e)
+            const filteredData = apply_filter(focusedData)
+
+            // checked.each((arg) => console.log())
             // d.path[0].id contains the id the pressed checkbox. The id got the same name as the filter element and thus updates the filter
-            filter[`${d.path[0].id}`] *= -1
-            drawBoxes(compute_summary(apply_filter(filteredData, filter)))
+            // filter[`${d.path[0].id}`] *= -1
+            const summary = compute_summary(filteredData)
+            draw_boxes(summary)
+            draw_outliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
         })
+    
+
         
 
     return [
         ([xMin, xMax]) => {
             
-            filteredData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
-            filteredData = apply_filter(filteredData, filter)
+            focusedData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
+            console.log(focusedData)
+            const filteredData = apply_filter(focusedData)
+            console.log(filteredData)
+            const summary = compute_summary(filteredData)
+            console.log(summary)
+            draw_boxes(summary)
+            draw_outliers(summary.map( d => d[1].outliers).reduce((acc, curr) => acc.concat(curr)))
 
-            drawBoxes(compute_summary(filteredData))
-
-            // drawDots(filteredData)
+            // drawDots(focusedData)
             // console.log(`Update day view with: [${xMin}, ${xMax}]`)
         },
         (filter) => {
