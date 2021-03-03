@@ -65,10 +65,12 @@ const make_day_view = (data) => {
             median = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.5)
             q3 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.75)
             interQuantileRange = q3 - q1
-            min = q1 - 1.5 * interQuantileRange
-            max = q3 + 1.5 * interQuantileRange
-            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, min: min, max: max})
-            }, d => d.hour)
+            minVertLine = q1 - 1.5 * interQuantileRange
+            maxVertLine = q3 + 1.5 * interQuantileRange
+            minCount = d3.min(v.map( h => { return h.count}))
+            maxCount = d3.max(v.map( h => { return h.count}))
+            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine, maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount})
+            }, d => d.hour).sort(d3.ascending)
     }
     
     // Axis
@@ -85,7 +87,7 @@ const make_day_view = (data) => {
         .paddingOuter(.5)
 
     const y = d3.scaleLinear()
-        .domain([-500, d3.max(hourData, d => d.count)])
+        .domain([0, d3.max(hourData, d => d.count)])
         .range([height - margin.bottom, margin.top])
 
     const op = d3.scaleLinear()
@@ -109,63 +111,126 @@ const make_day_view = (data) => {
     let boxWidth = width/48
     const drawBoxes = (data) => {
         // Vertical line
-        svg.selectAll("vertLines")
+        svg.selectAll(".vertLine")
         .data(data)
         .join(
             enter => enter.append("line")
+                            .attr("class", "vertLine")
                             .attr("x1", d => {return(x(d[0]))})
                             .attr("x2", d => {return(x(d[0]))})
-                            .attr("y1", d => {return(y(d[1].min))})
-                            .attr("y2", d => {return(y(d[1].max))})
+                            .attr("y1", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
                             .attr("stroke", "black"),
-            exit => exit.remove()
+            update => update.attr("y1", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
         )
 
         // The box
-        svg.selectAll("boxes")
+        svg.selectAll(".box")
         .data(data)
         .join(
             enter => enter.append("rect")
+                            .attr("class", "box")
                             .attr("x", d => {return(x(d[0])-boxWidth/2)})
                             .attr("y", d => {return(y(d[1].q3))})
                             .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
                             .attr("width", boxWidth )
                             .attr("stroke", "black")
                             .style("fill", "#69b3a2"),
-            exit => exit.remove()
+            update => update.attr("y", d => {return(y(d[1].q3))})
+                            .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
         )
 
         // Horizontal lines
-        svg.selectAll("minLines")
+        svg.selectAll(".minLine")
         .data(data)
-        .enter()
-        .append("line")
-            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-            .attr("y1", d => {return(y(d[1].min))})
-            .attr("y2", d => {return(y(d[1].min))})
-            .attr("stroke", "black")
-
-        svg.selectAll("medianLines")
+        .join(
+            enter => enter.append("line")
+                            .attr("class", "minLine")
+                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                            .attr("y1", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+                            .attr("stroke", "black"),
+            update => update.attr("y1", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].minCount > d[1].minVertLine){
+                                    return y(d[1].minCount)
+                                }
+                                return(y(d[1].minVertLine))})
+        )
+        
+        svg.selectAll(".medianLine")
         .data(data)
-        .enter()
-        .append("line")
-            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-            .attr("y1", d => {return(y(d[1].median))})
-            .attr("y2", d => {return(y(d[1].median))})
-            .attr("stroke", "black")
+        .join(
+            enter => enter.append("line")
+                            .attr("class", "medianLine")
+                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                            .attr("y1", d => {return(y(d[1].median))})
+                            .attr("y2", d => {return(y(d[1].median))})
+                            .attr("stroke", "black"),
+            update => update.attr("y1", d => {return(y(d[1].median))})
+                            .attr("y2", d => {return(y(d[1].median))})
+        )
 
-        svg.selectAll("maxLines")
+        svg.selectAll(".maxLine")
         .data(data)
-        .enter()
-        .append("line")
-            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-            .attr("y1", d => {return(y(d[1].max))})
-            .attr("y2", d => {return(y(d[1].max))})
-            .attr("stroke", "black")
-
+        .join(
+            enter => enter.append("line")
+                            .attr("class", "maxLine")
+                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                            .attr("y1", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
+                            .attr("stroke", "black"),
+            update => update.attr("y1", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
+                            .attr("y2", d => {
+                                if(d[1].maxCount < d[1].maxVertLine){
+                                    return y(d[1].maxCount)
+                                }
+                                return(y(d[1].maxVertLine))})
+        )
     }
     
     // The filter object that determines which data that is rendered and is updated by the checkboxes
@@ -198,7 +263,7 @@ const make_day_view = (data) => {
             
             filteredData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
             filteredData = apply_filter(filteredData, filter)
-            
+
             drawBoxes(compute_summary(filteredData))
 
             // drawDots(filteredData)
