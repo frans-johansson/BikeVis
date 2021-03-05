@@ -18,17 +18,26 @@
     </div>
     <div id="focus" class='container'>
         <div id="timeline-focus">
+            <h2>Timeline view</h2>
         </div>
-        <div id="day-view">
-            <input type="checkbox" class="filter dayProp" id="weekday" checked>
-            <label for="#weekday">Weekday</label>
-            <input type="checkbox" class="filter dayProp" id="weekend" checked>
-            <label for="#weekend">Weekend</label>
-            <input type="checkbox" class="filter dayProp" id="holiday" checked>
-            <label for="#holiday">Holiday</label>
-
-            <h2>Weather</h2>
-            <div id="weather-bar"></div>
+        <div id="day-focus">
+            <h2>24-hour view</h2>
+            <div>
+                <span>Showing: </span>
+                <input type="checkbox" class="filter dayProp" id="weekday" checked>
+                <label for="#weekday">Weekdays</label>
+                <input type="checkbox" class="filter dayProp" id="weekend" checked>
+                <label for="#weekend">Weekends</label>
+                <input type="checkbox" class="filter dayProp" id="holiday" checked>
+                <label for="#holiday">Holidays</label>
+            </div>
+            <div id="day-view">
+            </div>
+            <div id="weather-container">
+                <h3>Weather</h3>
+                <p>Filter out certain weather conditions</p>
+                <div id="weather-bar"></div>
+            </div>
         </div>
     </div>
 

@@ -3,7 +3,7 @@ const makeTimelineOverview = (aggData, brushed) => {
         .append('svg')
 
     const { width, height } = svg.node().getBoundingClientRect()
-    const margin = ({ top: 20, right: 20, bottom: 30, left: 20 })
+    const margin = ({ top: 10, right: 20, bottom: 30, left: 20 })
 
     const x = d3.scaleTime()
         .domain(d3.extent(aggData, d => d.timestamp))
@@ -50,7 +50,7 @@ const makeTimelineOverview = (aggData, brushed) => {
     // Handle outlier notifications
     const outlierNotifications = svg.append('g')
         .attr('class', 'outlier-notifications')
-        .attr('fill', 'red')
+        .attr('fill', 'tomato')
         .attr('pointer-events', 'all')
         .attr('transform', `translate(0,${height - margin.bottom})`)
 
