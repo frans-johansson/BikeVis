@@ -41,20 +41,25 @@ const makeDayView = (data) => {
         .call(yAxis);
     
     // Attatch the weather bar
-    weatherBar = d3.select('#weather-bar')
-        .append('svg')
-        .append('g')
+    weatherSvg = d3.select('#weather-bar').append('svg').attr('height', 20)
+    weatherBar = weatherSvg.append('g')
+    weatherBarText = weatherSvg.append('g')
+            .attr("font-family", "sans-serif")
+            .attr("font-size", 12)
 
     const weatherColor = d3.scaleOrdinal()
         .domain(hourData.map(d => d.weather_code))
-        .range(d3.schemeCategory10)
+        .range(d3.schemeSet2.slice(1))
 
     const weatherX = d3.scaleLinear()
         .domain([0, 1])
-        .range([margin.left, width - margin.right])
+        .range([20, width-20])
+
+    formatPercent = weatherX.tickFormat(null, "%")
 
     // Drawing the weather bar
     const drawWeatherBar = (data) => {
+        // Also based on a snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
         const weatherTransition = d3.transition()
             .duration(100)
             .ease(d3.easeLinear)
@@ -68,12 +73,39 @@ const makeDayView = (data) => {
                     .call(enter => enter.interrupt().transition(weatherTransition)
                         .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue))
                         .attr('x', d => weatherX(d.startValue))
-                    ),
+                    )
+                    .on('click', (e, d) => {
+                        weatherBoxes = d3.selectAll('.weather')
+                        if (weatherBoxes.filter(wd => wd != d.weather_code).classed('checked')) {
+                            weatherBoxes.classed('checked', wd => wd == d.weather_code)
+                        } else {
+                            weatherBoxes.classed('checked', true)
+                        }
+                        update()
+                    }),
                 update => update.call(
                     update => update.interrupt().transition(weatherTransition)
                         .attr('x', d => weatherX(d.startValue))
                         .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue)),
                 ),
+                exit => exit.remove()
+            )
+
+        weatherBarText.selectAll("text").data(data.filter(d => d.endValue - d.startValue > 0.08), d => d.weather_code)
+            .join(
+                enter => enter.append('text')
+                    .attr("fill", "black")
+                    .attr("x", 0)
+                    .attr("y", "0.7em")
+                    .text(d => formatPercent(d.percentage))
+                    .call(enter => enter.interrupt().transition(weatherTransition)
+                        .attr("transform", d => `translate(${weatherX(d.startValue) + 6}, 6)`)
+                    ),
+                update => update
+                    .text(d => formatPercent(d.percentage))
+                    .call(update => update.interrupt().transition(weatherTransition)
+                        .attr("transform", d => `translate(${weatherX(d.startValue) + 6}, 6)`)
+                    ),
                 exit => exit.remove()
             )
     }
@@ -141,7 +173,7 @@ const makeDayView = (data) => {
                             .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
                             .attr("width", boxWidth )
                             .attr("stroke", "black")
-                            .style("fill", "#69b3a2"),
+                            .style("fill", "steelblue"),
             update => update.attr("y", d => {return(y(d[1].q3))})
                             .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
         )
@@ -267,15 +299,74 @@ const makeDayView = (data) => {
             }, d => d.hour).sort(d3.ascending)
     }
     
-    // Convenience object for translating checkbox ID's to weather codes
-    const toWeatherCode = {
-        clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
+    // Create customized toggle buttons for the weather codes
+    const makeWeatherToggles = (data) => {
+        // List of all unique weathers currently in the data
+        // This is basically a copy-paste from the weather stacks function
+        // TODO: Refactor to be more DRY
+        const weathers = d3.sort(
+                        d3.rollups(data, v => v.length, d => d.weather_code),
+                        (a, b) => d3.descending(a[1], b[1])
+                    ).map(w => w[0])
+
+        // Convenience object for translating ID's to weather names
+        const weatherNames = {
+            1: "Clear sky",
+            2: "Few clouds",
+            3: "Shifting clouds",
+            4: "Cloudy",
+            7: "Rain",
+            10: "Thunder",
+            26: "Snow"
+        }
+
+        // Append weather elements as classed divs with '.checked' indicating
+        // the weather has been selected and should be displayed 
+        d3.select('#weather-bar').selectAll('.weather')
+            .data(weathers, d => d)
+            .join(
+                enter => enter
+                    .append('div')
+                    .classed('checked weather', true)
+                    .attr('id', d => d)
+                    .style('background-color', d => weatherColor(d))
+                    .style('opacity', (d, i, nodes) => {
+                        if (nodes[i].classList.contains('checked')) {
+                            return '1.0'
+                        } else {
+                            return '0.2'
+                        }
+                    })
+                    .html(d => weatherNames[d])
+                    .on('dblclick', ({currentTarget}, d) => {
+                        console.log(d3.select(currentTarget))
+                        weatherBoxes = d3.selectAll('.weather')
+                        weatherBoxes.classed('checked', wd => wd == d)
+                        update()
+                    })
+                    .on('click', ({currentTarget}) => {
+                        // Toggle the checked class on the target
+                        const clicked = d3.select(currentTarget) 
+                        const status = clicked.classed('checked')
+                        clicked.classed('checked', !status)
+                        // Update visualizations
+                        update()
+                    }),
+                update => update
+                    .style('opacity', (d, i, nodes) => {
+                        if (nodes[i].classList.contains('checked')) {
+                            return '1.0'
+                        } else {
+                            return '0.2'
+                        }
+                    })
+            )
     }
 
     // Takes a dataset and a filter objects filters the data with the filter. This function can take already filtered data and apply another filter to it.
     const applyFilter = (data) => {
-        const weatherBoxes = d3.selectAll('.weather').nodes()
-        const weathers = weatherBoxes.filter(w => w.checked).map(w => toWeatherCode[w.id])
+        const weatherBoxes = d3.selectAll('.weather.checked').nodes()
+        const weathers = weatherBoxes.map(w => +w.id)
 
         const dayPropBoxes = d3.selectAll('.dayProp').nodes()
         const dayProps = dayPropBoxes.map(d => d.checked)
@@ -289,10 +380,11 @@ const makeDayView = (data) => {
 
     // Updates all visualizations with potentially new filters
     const update = () => {
+        makeWeatherToggles(focusedData)
         const filteredData = applyFilter(focusedData)
         const summary = computeSummary(filteredData)
         drawBoxes(summary)
-        drawOutliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
+        // drawOutliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
         drawWeatherBar(computeWeatherStacks(filteredData))
     }
 
