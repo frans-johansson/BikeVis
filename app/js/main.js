@@ -49,9 +49,9 @@ const main = async () => {
     const data = await loadData()
     
     // Initialize and link the visualizations
-    const updateFocusSpan = make_timeline_focus(data.weeks, data.days)
-    const [updateDayViewSpan, updateDayViewFilter] = make_day_view(data.hours)
-    make_timeline_overview(data.weeks, (fromBrushed) => {
+    const updateFocusSpan = makeTimelineFocus(data.weeks, data.days)
+    const updateDayViewSpan = makeDayView(data.hours)
+    makeTimelineOverview(data.weeks, (fromBrushed) => {
         updateFocusSpan(fromBrushed)
         updateDayViewSpan(fromBrushed)
     })

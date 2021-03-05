@@ -1,4 +1,4 @@
-const make_timeline_focus = (week_data, day_data) => {
+const makeTimelineFocus = (week_data, dayData) => {
     let svg = d3.select('#timeline-focus')
         .append('svg')
 
@@ -14,10 +14,10 @@ const make_timeline_focus = (week_data, day_data) => {
         .attr("height", height - margin.bottom - margin.top);
 
     let x = d3.scaleTime()
-        .domain(d3.extent(day_data, d => d.timestamp))
+        .domain(d3.extent(dayData, d => d.timestamp))
         .range([margin.left, width - margin.right])
     const y = d3.scaleLinear()
-        .domain([0, d3.max(day_data, d => d.sum_count + 10000)])
+        .domain([0, d3.max(dayData, d => d.sum_count + 10000)])
         .range([height - margin.bottom, margin.top])
 
     const xAxis = g => g
@@ -38,7 +38,7 @@ const make_timeline_focus = (week_data, day_data) => {
         .attr("class", "y-axis")
         .call(yAxis);
     svg.append("path")
-        .datum(day_data)
+        .datum(dayData)
         .attr("fill", "none")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 1.5)
@@ -50,7 +50,7 @@ const make_timeline_focus = (week_data, day_data) => {
 
     return ([xMin, xMax]) => {
         x.domain([xMin, xMax])
-        y.domain([0, d3.max(day_data, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.sum_count + 10000 : null)])
+        y.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.sum_count + 10000 : null)])
         svg.select('.focus-path').attr("d", line)
         svg.select('.x-axis').call(xAxis)
         svg.select('.y-axis').call(yAxis)

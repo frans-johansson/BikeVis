@@ -1,87 +1,14 @@
-const make_day_view = (data) => {
+const makeDayView = (data) => {
     const hourOf = d3.timeFormat("%H")
     const hourData = data.map(d => ({ ...d, hour: hourOf(d.timestamp) }))
     let focusedData = []
 
-    // ******************* OLD CODE WITH DOTS *********************
-
-    // Takes any array of objects and groups it by hour of the day.
-    // Returns an array of 24 objects that each contains a timestamp and the mean count for that hour.
-
-    // let svg = d3.select('#day-view')
-    //     .append('svg')
-
-    // const { width, height } = svg.node().getBoundingClientRect()
-    // const margin = ({ top: 20, right: 20, bottom: 50, left: 50 })
-
-    // const x = d3.scalePoint()
-    //     .domain(hourData.map(d => d.hour))
-    //     .rangeRound([margin.left, width - margin.right])
-    //     .padding(1)
-    // const y = d3.scaleLinear()
-    //     .domain([0, d3.max(hourData, d => d.count)])
-    //     .range([height - margin.bottom, margin.top])
-    // const op = d3.scaleLinear()
-    //     .domain([0, hourData.length])
-    //     .range([0.2, 0.05])
-
-    // const xAxis = g => g
-    //     .attr('transform', `translate(0,${height - margin.bottom})`)
-    //     .call(d3.axisBottom(x))
-    // const yAxis = g => g
-    //     .attr('transform', `translate(${margin.left},0)`)
-    //     .call(d3.axisLeft(y))
-
-    // svg.append('g')
-    //     .call(xAxis);
-    // svg.append('g')
-    //     .call(yAxis);
-
-    // const dots = svg.append("g")
-    //     .attr("fill", "steelblue")
-    //     .attr("pointer-events", "all")
-            
-    // const drawDots = (data) => {
-    //     dots.selectAll("circle")
-    //         .data(data, (d) => d.timestamp)
-    //         .join(
-    //             enter => enter.append('circle')
-    //                         .attr("opacity", `${op(data.length)}`)
-    //                         .attr("r", 3.5)
-    //                         .attr("cx", d => x(d.hour))
-    //                         .attr("cy", d => y(d.count)),
-    //             update => update.attr("opacity", `${op(data.length)}`),
-    //             exit => exit.remove()
-    //         )
-    // }
-    // ***************************************************************
-
-    // Compute the data needed for the box plot
-    const compute_summary = (data) => {
-        return d3.rollups(data, v => {
-            q1 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.25)
-            median = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.5)
-            q3 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.75)
-            interQuantileRange = q3 - q1
-            minVertLine = q1 - 1.5 * interQuantileRange
-            maxVertLine = q3 + 1.5 * interQuantileRange
-            minCount = d3.min(v.map( h => { return h.count}))
-            maxCount = d3.max(v.map( h => { return h.count}))
-            outliers = []
-            
-            if(minCount < minVertLine || maxCount > maxVertLine){
-                outliers = v.filter( d => d.count < minVertLine || d.count > maxVertLine)
-            }
-            
-            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine,
-                    maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount, outliers: outliers})
-            }, d => d.hour).sort(d3.ascending)
-    }
     
-    // Axis
+    // SVG element handle for the box plot view
     let svg = d3.select('#day-view')
         .append('svg')
 
+    // Sizing parameters
     const { width, height } = svg.node().getBoundingClientRect()
     const margin = ({ top: 20, right: 20, bottom: 50, left: 50 })
 
@@ -99,6 +26,7 @@ const make_day_view = (data) => {
         .domain([0, hourData.length])
         .range([0.2, 0.05])
 
+    // Axes
     const xAxis = g => g
         .attr('transform', `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(x))
@@ -125,7 +53,7 @@ const make_day_view = (data) => {
         .domain([0, 1])
         .range([margin.left, width - margin.right])
 
-    // Function for drawing the weather bar
+    // Drawing the weather bar
     const drawWeatherBar = (data) => {
         const weatherTransition = d3.transition()
             .duration(100)
@@ -150,9 +78,27 @@ const make_day_view = (data) => {
             )
     }
 
-    // Function that draws the boxes
-    let boxWidth = width/48
-    const draw_boxes = (data) => {
+    const computeWeatherStacks = (data) => {
+        const weather_counts = d3.sort(
+                        d3.rollups(data, v => v.length, d => d.weather_code),
+                        (a, b) => d3.descending(a[1], b[1])
+                    )
+
+        // Neat snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
+        const total = d3.sum(weather_counts, d => d[1]);
+        let value = 0;
+        return d3.sort(weather_counts.map(d => ({
+            weather_code: d[0],
+            percentage: d[1] / total,
+            startValue: value / total,
+            endValue: (value += d[1]) / total
+        })));
+    }
+
+    // Drawing the box plots
+    const boxWidth = width/48
+    
+    const drawBoxes = (data) => {
         // Vertical line
         svg.selectAll(".vertLine")
         .data(data)
@@ -276,12 +222,12 @@ const make_day_view = (data) => {
         )
     }
 
-    // Function that draws the outliers as dots
+    // Drawing outliers as dots
     const dots = svg.append("g")
         .attr("fill", "red")
         .attr("pointer-events", "all")
 
-    const draw_outliers = data => {
+    const drawOutliers = data => {
         
         // console.log(data)
         dots.selectAll(".outlier")
@@ -299,97 +245,65 @@ const make_day_view = (data) => {
         
     }
     
-    // The filter object that determines which data that is rendered and is updated by the checkboxes
-    let filter = {
-        weekday: 1, weekend: 1, holiday: 1,
-        clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
+    // Compute the data needed for the box plot
+    const computeSummary = (data) => {
+        return d3.rollups(data, v => {
+            q1 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.25)
+            median = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.5)
+            q3 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.75)
+            interQuantileRange = q3 - q1
+            minVertLine = q1 - 1.5 * interQuantileRange
+            maxVertLine = q3 + 1.5 * interQuantileRange
+            minCount = d3.min(v.map( h => { return h.count}))
+            maxCount = d3.max(v.map( h => { return h.count}))
+            outliers = []
+            
+            if(minCount < minVertLine || maxCount > maxVertLine){
+                outliers = v.filter( d => d.count < minVertLine || d.count > maxVertLine)
+            }
+            
+            return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine,
+                    maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount, outliers: outliers})
+            }, d => d.hour).sort(d3.ascending)
     }
+    
+    // Convenience object for translating checkbox ID's to weather codes
     const toWeatherCode = {
         clear: 1, cloud1: 2, cloud2: 3, cloud3: 4, rain: 7, thunder: 10, snow: 26
     }
-    // let summary = []
-    // let focusedData = []
 
     // Takes a dataset and a filter objects filters the data with the filter. This function can take already filtered data and apply another filter to it.
-    const apply_filter = (data) => {
+    const applyFilter = (data) => {
         const weatherBoxes = d3.selectAll('.weather').nodes()
         const weathers = weatherBoxes.filter(w => w.checked).map(w => toWeatherCode[w.id])
 
         const dayPropBoxes = d3.selectAll('.dayProp').nodes()
         const dayProps = dayPropBoxes.map(d => d.checked)
 
-        console.log(dayProps)
-        console.log(`Holiday: ${data[0].is_holiday  && dayProps[0]}`)
-        console.log(`Weekend: ${data[0].is_weekend  && dayProps[1]}`)
-        console.log(`Weekday: ${!data[0].is_weekend && dayProps[2]}`)
-        // console.log(data[0])
-        // console.log(weathers)
-        // console.log(`Check if includes works: ${weathers.includes(data[0].weather_code)}`)
-        // weathers.includes(d.weather_code)
-
-        return data.filter(d => weathers.includes(d.weather_code)    &&
-                                ((d.is_holiday  && dayProps[2]) ||
-                                 (d.is_weekend  && dayProps[1]) ||
+        return data.filter(d => weathers.includes(d.weather_code) &&
+                                ((d.is_holiday  && dayProps[2])   ||
+                                 (d.is_weekend  && dayProps[1])   ||
                                  (!d.is_weekend && dayProps[0])))
-
-        // return data.filter( d => (d.is_weekend != filter.weekend || do.is_weekend == filter.weekend || d.is_holiday == filter.holiday)
-        //                                 && 
-        //                                 (d.weather_code == filter.clear || d.weather_code == filter.cloud1 || d.weather_code == filter.cloud2
-        //                                 || d.weather_code == filter.cloud3 || d.weather_code == filter.rain || d.weather_code == filter.thunder
-        //                                 || d.weather_code == filter.snow))
     }
 
-    const computeWeatherStacks = (data) => {
-        const weather_counts = d3.sort(
-                        d3.rollups(data, v => v.length, d => d.weather_code),
-                        (a, b) => d3.descending(a[1], b[1])
-                    )
 
-        // Neat snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
-        const total = d3.sum(weather_counts, d => d[1]);
-        let value = 0;
-        return d3.sort(weather_counts.map(d => ({
-            weather_code: d[0],
-            percentage: d[1] / total,
-            startValue: value / total,
-            endValue: (value += d[1]) / total
-        })));
+    // Updates all visualizations with potentially new filters
+    const update = () => {
+        const filteredData = applyFilter(focusedData)
+        const summary = computeSummary(filteredData)
+        drawBoxes(summary)
+        drawOutliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
+        drawWeatherBar(computeWeatherStacks(filteredData))
     }
 
     // Updates the filter when a checkbox is changed
     d3.selectAll(".filter")
-        .on("change", e => {
-            // console.log(e)
-            const filteredData = apply_filter(focusedData)
-
-            // checked.each((arg) => console.log())
-            // d.path[0].id contains the id the pressed checkbox. The id got the same name as the filter element and thus updates the filter
-            // filter[`${d.path[0].id}`] *= -1
-            const summary = compute_summary(filteredData)
-            draw_boxes(summary)
-            draw_outliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
-            drawWeatherBar(computeWeatherStacks(filteredData))
-        })
-    
-
+        .on("change", update)
         
-
-    return [
-        ([xMin, xMax]) => {
-            
+    // Return a function that accepts a brushed date range from the overview
+    return ([xMin, xMax]) => {
+            // Filter the hourly data to the brushed date range
             focusedData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
-
-            const filteredData = apply_filter(focusedData)
-            const summary = compute_summary(filteredData)
-            draw_boxes(summary)
-            draw_outliers(summary.map( d => d[1].outliers).reduce((acc, curr) => acc.concat(curr)))
-            drawWeatherBar(computeWeatherStacks(filteredData))
-
-            // drawDots(focusedData)
-            // console.log(`Update day view with: [${xMin}, ${xMax}]`)
-        },
-        (filter) => {
-            console.log(`Update day filter with: ${filter}`)
+            update()
         }
-    ]
 }

@@ -1,4 +1,4 @@
-const make_timeline_overview = (agg_data, brushed) => {
+const makeTimelineOverview = (aggData, brushed) => {
     let svg = d3.select('#timeline-overview')
         .append('svg')
 
@@ -6,10 +6,10 @@ const make_timeline_overview = (agg_data, brushed) => {
     const margin = ({ top: 20, right: 20, bottom: 30, left: 20 })
 
     const x = d3.scaleTime()
-        .domain(d3.extent(agg_data, d => d.timestamp))
+        .domain(d3.extent(aggData, d => d.timestamp))
         .range([margin.left, width - margin.right])
     const y = d3.scaleLinear()
-        .domain([0, d3.max(agg_data, d => d.sum_count)])
+        .domain([0, d3.max(aggData, d => d.sum_count)])
         .range([height - margin.bottom, margin.top])
 
     const xAxis = g => g
@@ -28,7 +28,7 @@ const make_timeline_overview = (agg_data, brushed) => {
     // svg.append('g')
     //     .call(yAxis);
     svg.append("path")
-        .datum(agg_data)
+        .datum(aggData)
         .attr("fill", "none")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 1.5)
@@ -55,7 +55,7 @@ const make_timeline_overview = (agg_data, brushed) => {
         .attr('transform', `translate(0,${height - margin.bottom})`)
 
     const drawOutlierNotifications = (threshold) => {
-        const outliers = agg_data.filter(d => d.pearson < threshold)
+        const outliers = aggData.filter(d => d.pearson < threshold)
         outlierNotifications.selectAll('circle').data(outliers)
             .join(
                 enter => enter.append('circle')
