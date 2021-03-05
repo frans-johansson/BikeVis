@@ -111,6 +111,44 @@ const make_day_view = (data) => {
         .call(xAxis);
     svg.append('g')
         .call(yAxis);
+    
+    // Attatch the weather bar
+    weatherBar = d3.select('#weather-bar')
+        .append('svg')
+        .append('g')
+
+    const weatherColor = d3.scaleOrdinal()
+        .domain(hourData.map(d => d.weather_code))
+        .range(d3.schemeCategory10)
+
+    const weatherX = d3.scaleLinear()
+        .domain([0, 1])
+        .range([margin.left, width - margin.right])
+
+    // Function for drawing the weather bar
+    const drawWeatherBar = (data) => {
+        const weatherTransition = d3.transition()
+            .duration(100)
+            .ease(d3.easeLinear)
+
+        weatherBar.selectAll('rect').data(data, d => d.weather_code)
+            .join(
+                enter => enter.append('rect')
+                    .attr('fill', d => weatherColor(d.weather_code))
+                    .attr('y', 0.5)
+                    .attr('height', 20)
+                    .call(enter => enter.interrupt().transition(weatherTransition)
+                        .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue))
+                        .attr('x', d => weatherX(d.startValue))
+                    ),
+                update => update.call(
+                    update => update.interrupt().transition(weatherTransition)
+                        .attr('x', d => weatherX(d.startValue))
+                        .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue)),
+                ),
+                exit => exit.remove()
+            )
+    }
 
     // Function that draws the boxes
     let boxWidth = width/48
@@ -301,6 +339,23 @@ const make_day_view = (data) => {
         //                                 || d.weather_code == filter.snow))
     }
 
+    const computeWeatherStacks = (data) => {
+        const weather_counts = d3.sort(
+                        d3.rollups(data, v => v.length, d => d.weather_code),
+                        (a, b) => d3.descending(a[1], b[1])
+                    )
+
+        // Neat snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
+        const total = d3.sum(weather_counts, d => d[1]);
+        let value = 0;
+        return d3.sort(weather_counts.map(d => ({
+            weather_code: d[0],
+            percentage: d[1] / total,
+            startValue: value / total,
+            endValue: (value += d[1]) / total
+        })));
+    }
+
     // Updates the filter when a checkbox is changed
     d3.selectAll(".filter")
         .on("change", e => {
@@ -313,6 +368,7 @@ const make_day_view = (data) => {
             const summary = compute_summary(filteredData)
             draw_boxes(summary)
             draw_outliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
+            drawWeatherBar(computeWeatherStacks(filteredData))
         })
     
 
@@ -322,13 +378,12 @@ const make_day_view = (data) => {
         ([xMin, xMax]) => {
             
             focusedData = hourData.filter(d => xMin <= d.timestamp && d.timestamp <= xMax)
-            console.log(focusedData)
+
             const filteredData = apply_filter(focusedData)
-            console.log(filteredData)
             const summary = compute_summary(filteredData)
-            console.log(summary)
             draw_boxes(summary)
             draw_outliers(summary.map( d => d[1].outliers).reduce((acc, curr) => acc.concat(curr)))
+            drawWeatherBar(computeWeatherStacks(filteredData))
 
             // drawDots(focusedData)
             // console.log(`Update day view with: [${xMin}, ${xMax}]`)
