@@ -42,240 +42,362 @@ const makeDayView = (data) => {
         .call(yAxis);
     
     // Attatch the weather bar
-    weatherSvg = d3.select('#weather-bar').append('svg').attr('height', 20)
-    weatherBar = weatherSvg.append('g')
-    weatherBarText = weatherSvg.append('g')
-            .attr("font-family", "sans-serif")
-            .attr("font-size", 12)
-
+    const weatherSvg = d3.select('#weather-bar').append('svg')
     const weatherColor = d3.scaleOrdinal()
         .domain(hourData.map(d => d.weather_code))
         .range(d3.schemeSet2.slice(1))
 
     const weatherX = d3.scaleLinear()
         .domain([0, 1])
-        .range([20, width-20])
-
+        .range([5, width-margin.right-margin.left-120])
+    
     formatPercent = weatherX.tickFormat(null, "%")
 
-    // Drawing the weather bar
-    const drawWeatherBar = (data) => {
-        // Also based on a snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
-        const weatherTransition = d3.transition()
-            .duration(100)
-            .ease(d3.easeLinear)
-
-        weatherBar.selectAll('rect').data(data, d => d.weather_code)
-            .join(
-                enter => enter.append('rect')
-                    .attr('fill', d => weatherColor(d.weather_code))
-                    .attr('y', 0.5)
-                    .attr('height', 20)
-                    .call(enter => enter.interrupt().transition(weatherTransition)
-                        .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue))
-                        .attr('x', d => weatherX(d.startValue))
-                    )
-                    .on('click', (e, d) => {
-                        weatherBoxes = d3.selectAll('.weather')
-                        if (weatherBoxes.filter(wd => wd != d.weather_code).classed('checked')) {
-                            weatherBoxes.classed('checked', wd => wd == d.weather_code)
-                        } else {
-                            weatherBoxes.classed('checked', true)
-                        }
-                        update()
-                    }),
-                update => update.call(
-                    update => update.interrupt().transition(weatherTransition)
-                        .attr('x', d => weatherX(d.startValue))
-                        .attr('width', d => weatherX(d.endValue) - weatherX(d.startValue)),
-                ),
-                exit => exit.remove()
-            )
-
-        weatherBarText.selectAll("text").data(data.filter(d => d.endValue - d.startValue > 0.08), d => d.weather_code)
-            .join(
-                enter => enter.append('text')
-                    .attr("fill", "black")
-                    .attr("x", 0)
-                    .attr("y", "0.7em")
-                    .text(d => formatPercent(d.percentage))
-                    .call(enter => enter.interrupt().transition(weatherTransition)
-                        .attr("transform", d => `translate(${weatherX(d.startValue) + 6}, 6)`)
-                    ),
-                update => update
-                    .text(d => formatPercent(d.percentage))
-                    .call(update => update.interrupt().transition(weatherTransition)
-                        .attr("transform", d => `translate(${weatherX(d.startValue) + 6}, 6)`)
-                    ),
-                exit => exit.remove()
-            )
+    const computeWeatherStacks = (data) => {
+        const weather_counts = d3.rollups(data, v => v.length, d => d.weather_code)
+        
+        return weather_counts.map(d => ({
+            weather_code: d[0],
+            value: d[1]
+        }))
+    }
+    
+    // Initializer function for the weather bar groups
+    const initWeatherBars = (selection) => {
+        selection
+            .classed('weather checked', true)
+            .attr('id', d => d.weather_code)
+            .attr('fill', (d, i, nodes) => {
+                if (nodes[i].classList.contains('solo')) {
+                    return weatherColor(d.weather_code)
+                } else {
+                    return 'steelblue'
+                }
+            })
+            // .attr('transform', d => `translate(${margin.left}, ${weatherY(d.weather_code)})`)
+            .attr("font-family", "sans-serif")
+            .attr("font-size", 12)
+            .on('click', ({currentTarget}) => {
+                // Toggle the checked class on the target
+                const clicked = d3.select(currentTarget) 
+                const status = clicked.classed('checked')
+                clicked.classed('checked', !status)
+                clicked.classed('solo', false)
+                // Update visualizations
+                update()
+            })
     }
 
-    const computeWeatherStacks = (data) => {
-        const weather_counts = d3.sort(
-                        d3.rollups(data, v => v.length, d => d.weather_code),
-                        (a, b) => d3.descending(a[1], b[1])
-                    )
+    // Initialize the bar groups to make sure the initial filtering works
+    // Solving the chicken and egg problem
+    weatherSvg.selectAll('.weather')
+        .data(computeWeatherStacks(hourData))
+        .join('g').call(initWeatherBars)
 
-        // Neat snippet from https://observablehq.com/@d3/single-stack-normalized-horizontal-bar-chart
-        const total = d3.sum(weather_counts, d => d[1]);
-        let value = 0;
-        return d3.sort(weather_counts.map(d => ({
-            weather_code: d[0],
-            percentage: d[1] / total,
-            startValue: value / total,
-            endValue: (value += d[1]) / total
-        })));
+    // New weather bar
+    const drawWeatherBar = (stacks, weatherFilter) => {
+        const { height } = weatherSvg.node().getBoundingClientRect()
+
+        let filteredStacks = d3.sort(stacks.map(s => {
+            if (weatherFilter(s))
+                return s
+            else
+                return {...s, value: 0}
+        }), (a, b) => d3.descending(a.value, b.value))
+        const total = d3.sum(filteredStacks, s => s.value)
+        filteredStacks = filteredStacks.map(s => ({...s, percentage: s.value/total}))
+
+        // Convenience object for translating ID's to weather names
+        const weatherNames = {
+            1: "Clear sky",
+            2: "Few clouds",
+            3: "Shifting clouds",
+            4: "Cloudy",
+            7: "Rain",
+            10: "Thunder",
+            26: "Snow"
+        }
+
+        // Scale to position bars along the vertical
+        const weatherY = d3.scaleBand()
+            .domain(filteredStacks.map(s => s.weather_code))
+            .rangeRound([0, height])
+            .paddingInner(1)
+            .paddingOuter(.5)
+
+        // Transitions are neato
+        const transition = d3.transition()
+            .duration(200)
+            .ease(d3.easeLinear)
+        
+        let bars = weatherSvg.selectAll('.weather')
+            .data(filteredStacks, d => d.weather_code)
+            .join(
+                enter => enter.append('g')
+                    .call(initWeatherBars)
+                    .call(enter => enter.transition(transition)
+                        .attr('transform', d => `translate(${margin.left}, ${weatherY(d.weather_code)})`)
+                    ),
+                update => update
+                    .attr('id', d => d.weather_code)
+                    .call(update => update.transition(transition)
+                        .attr('transform', d => `translate(${margin.left}, ${weatherY(d.weather_code)})`)
+                        .attr('opacity', (d, i, nodes) => {
+                            if (nodes[i].classList.contains('checked')) {
+                                return '1.0'
+                            } else {
+                                return '0.5'
+                            }
+                        })
+                        .attr('fill', (d, i, nodes) => {
+                            if (nodes[i].classList.contains('solo')) {
+                                return weatherColor(d.weather_code)
+                            } else {
+                                return 'steelblue'
+                            }
+                        })
+                    ),
+                exit => exit.remove()
+            )
+
+        bars.selectAll('rect')
+            .data(d => [d.percentage])
+            .join('rect')
+                .attr('x', 80)
+                .attr('height', 15)
+                .transition(transition)
+                .attr('width', d => weatherX(d))
+
+        bars.selectAll('.percent')
+            .data(d => [d.percentage])
+            .join('text')
+                .attr('class', 'percent')
+                .attr('fill', 'black')
+                .attr("y", 3 + 15/2)
+                .text(d => d != 0 ? (d > 0.01 ? formatPercent(d) : '<1%') : '')
+                .transition(transition)
+                .attr("x", d => 85 + weatherX(d))
+
+        bars.selectAll('.weather-label')
+            .data(d => [d.weather_code])
+            .join('text')
+                .attr('class', 'weather-label')
+                .attr('fill', 'black')
+                .attr('text-anchor', 'end')
+                .attr("x", 70)
+                .attr("y", 3 + 15/2)
+                .text(d => weatherNames[d])
+        
+        bars.selectAll('.solo-toggle')
+            .data(d => [d])
+            .join('circle')
+                .attr('cy', 5)
+                .attr('r', 5)
+                .attr('cx', -margin.left+8)
+                .attr('class', 'solo-toggle')
+                .on('click', (e) => {
+                    e.stopPropagation()
+                    let parent = d3.select(e.currentTarget.parentNode)
+                    if (!parent.classed('checked'))
+                        return
+                    const status = parent.classed('solo')
+                    parent.classed('solo', !status)
+                    update()
+                })
+                .on('mouseover', ({currentTarget}) => {
+                    d3.select(currentTarget).attr('r', 8)
+                })
+                .on('mouseout', ({currentTarget}) => {
+                    d3.select(currentTarget).attr('r', 5)
+                })
     }
 
     // Drawing the box plots
-    const boxWidth = width/48
+    const defaultWidth = 1.5*width/48
     
     const drawBoxes = (data) => {
+        const boxWidth = defaultWidth / data.length
+
+        const transitionLength = 150
+        const transition = d3.transition()
+            .duration(transitionLength)
+            .ease(d3.easeLinear)
+        const stagger = (d, i) => (i+1)*transitionLength/24
+
+        // Groups for each summary
+        const g = svg.selectAll('.summary-group')
+            .data(data, d => d.id)
+            .join('g')
+                .attr('class', 'summary-group')
+                .style("fill", (d) => {
+                    if (d.id === 'combined') {
+                        return 'steelblue'
+                    } else {
+                        return weatherColor(d.id)
+                    }
+                })
+                .call(join => join.transition(transition)
+                    .attr('transform', (d, i) => `translate(${-defaultWidth+boxWidth*0.5*(2*i+data.length+1)}, 0)`)
+                )
+
         // Vertical line
-        svg.selectAll(".vertLine")
-        .data(data)
+        g.selectAll(".vertLine")
+        .data(d => d.summary, d => d[0])
         .join(
             enter => enter.append("line")
-                            .attr("class", "vertLine")
-                            .attr("x1", d => {return(x(d[0]))})
-                            .attr("x2", d => {return(x(d[0]))})
-                            .attr("y1", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
-                            .attr("stroke", "black"),
-            update => update.attr("y1", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
+                .attr("class", "vertLine")
+                .attr("x1", d => {return(x(d[0]))})
+                .attr("x2", d => {return(x(d[0]))})
+                .attr('y1', d => y(d[1].median))
+                .attr('y2', d => y(d[1].median))
+                .call(enter => enter.transition(transition).delay(stagger)
+                    .attr("y1", d => {
+                        if(d[1].minCount > d[1].minVertLine){
+                            return y(d[1].minCount)
+                        }
+                        return(y(d[1].minVertLine))})
+                    .attr("y2", d => {
+                        if(d[1].maxCount < d[1].maxVertLine){
+                            return y(d[1].maxCount)
+                        }
+                        return(y(d[1].maxVertLine))})
+                )
+                .attr("stroke", "black"),
+            update => update.call(update => update.transition(transition).delay(stagger)
+                .attr("y1", d => {
+                    if(d[1].minCount > d[1].minVertLine){
+                        return y(d[1].minCount)
+                    }
+                    return(y(d[1].minVertLine))})
+                .attr("y2", d => {
+                    if(d[1].maxCount < d[1].maxVertLine){
+                        return y(d[1].maxCount)
+                    }
+                    return(y(d[1].maxVertLine))})
+            )
         )
 
         // The box
-        svg.selectAll(".box")
-        .data(data)
+        g.selectAll(".box")
+        .data(d => d.summary, d => d[0])
         .join(
             enter => enter.append("rect")
-                            .attr("class", "box")
-                            .attr("x", d => {return(x(d[0])-boxWidth/2)})
-                            .attr("y", d => {return(y(d[1].q3))})
-                            .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
-                            .attr("width", boxWidth )
-                            .attr("stroke", "black")
-                            .style("fill", "steelblue"),
-            update => update.attr("y", d => {return(y(d[1].q3))})
-                            .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
+                .attr("class", "box")
+                .attr("x", d => {return(x(d[0]))})
+                .attr("y", d => {return(y(d[1].q3))})
+                .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
+                .call(enter => enter.transition(transition).delay(stagger)
+                    .attr("width", boxWidth)
+                    .attr("x", d => {return(x(d[0])-boxWidth/2)})
+                )
+                .attr("stroke", "black"),
+            update => update.call(update => update.transition(transition).delay(stagger)
+                .attr("y", d => {return(y(d[1].q3))})
+                .attr("height", d => {return(y(d[1].q1)-y(d[1].q3))})
+                .attr("x", d => {return(x(d[0])-boxWidth/2)})
+                .attr("width", boxWidth)
+            )
         )
 
         // Horizontal lines
-        svg.selectAll(".minLine")
-        .data(data)
+        g.selectAll(".minLine")
+        .data(d => d.summary, d => d[0])
         .join(
             enter => enter.append("line")
-                            .attr("class", "minLine")
-                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-                            .attr("y1", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-                            .attr("stroke", "black"),
-            update => update.attr("y1", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].minCount > d[1].minVertLine){
-                                    return y(d[1].minCount)
-                                }
-                                return(y(d[1].minVertLine))})
-        )
-        
-        svg.selectAll(".medianLine")
-        .data(data)
-        .join(
-            enter => enter.append("line")
-                            .attr("class", "medianLine")
-                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-                            .attr("y1", d => {return(y(d[1].median))})
-                            .attr("y2", d => {return(y(d[1].median))})
-                            .attr("stroke", "black"),
-            update => update.attr("y1", d => {return(y(d[1].median))})
-                            .attr("y2", d => {return(y(d[1].median))})
-        )
-
-        svg.selectAll(".maxLine")
-        .data(data)
-        .join(
-            enter => enter.append("line")
-                            .attr("class", "maxLine")
-                            .attr("x1", d => {return(x(d[0])-boxWidth/2) })
-                            .attr("x2", d => {return(x(d[0])+boxWidth/2) })
-                            .attr("y1", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
-                            .attr("stroke", "black"),
-            update => update.attr("y1", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
-                            .attr("y2", d => {
-                                if(d[1].maxCount < d[1].maxVertLine){
-                                    return y(d[1].maxCount)
-                                }
-                                return(y(d[1].maxVertLine))})
-        )
-    }
-
-    // Drawing outliers as dots
-    const dots = svg.append("g")
-        .attr("fill", "red")
-        .attr("pointer-events", "all")
-
-    const drawOutliers = data => {
-        
-        // console.log(data)
-        dots.selectAll(".outlier")
-            .data(data)
-            .join(
-                enter => enter.append("circle")
-                            .attr("class", "outlier")
-                            .attr("opacity", `${op(data.length)}`)
-                            .attr("r", 3.5)
-                            .attr("cx", d => x(d.hour))
-                            .attr("cy", d => y(d.count)),
-                update => update.attr("opacity", `${op(data.length)}`),
-                exit => exit.remove()
+                .attr("class", "minLine")
+                .attr("y1", d => {
+                    if(d[1].minCount > d[1].minVertLine){
+                        return y(d[1].minCount)
+                    }
+                    return(y(d[1].minVertLine))})
+                .attr("y2", d => {
+                    if(d[1].minCount > d[1].minVertLine){
+                        return y(d[1].minCount)
+                    }
+                    return(y(d[1].minVertLine))})
+                .attr("x1", d => {return(x(d[0])) })
+                .attr("x2", d => {return(x(d[0])) })
+                .call(enter => enter.transition(transition).delay(stagger)
+                    .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                    .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                )
+                .attr("stroke", "black"),
+            update => update.call(update => update.transition(transition).delay(stagger)
+                .attr("y1", d => {
+                    if(d[1].minCount > d[1].minVertLine){
+                        return y(d[1].minCount)
+                    }
+                    return(y(d[1].minVertLine))})
+                .attr("y2", d => {
+                    if(d[1].minCount > d[1].minVertLine){
+                        return y(d[1].minCount)
+                    }
+                    return(y(d[1].minVertLine))})
+                .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                .attr("x2", d => {return(x(d[0])+boxWidth/2) })
             )
+        )
         
+        g.selectAll(".medianLine")
+        .data(d => d.summary, d => d[0])
+        .join(
+            enter => enter.append("line")
+                .attr("class", "medianLine")
+                .attr("y1", d => {return(y(d[1].median))})
+                .attr("y2", d => {return(y(d[1].median))})
+                .attr("x1", d => {return(x(d[0])) })
+                .attr("x2", d => {return(x(d[0])) })
+                .call(enter => enter.transition(transition).delay(stagger)
+                    .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                    .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                )
+                .attr("stroke", "black"),
+            update => update
+                .call(update => update.transition(transition).delay(stagger)
+                    .attr("y1", d => {return(y(d[1].median))})
+                    .attr("y2", d => {return(y(d[1].median))})
+                    .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                    .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                )
+        )
+
+        g.selectAll(".maxLine")
+        .data(d => d.summary, d => d[0])
+        .join(
+            enter => enter.append("line")
+                .attr("class", "maxLine")
+                .attr("x1", d => {return(x(d[0])) })
+                .attr("x2", d => {return(x(d[0])) })
+                .call(enter => enter.transition(transition).delay(stagger)
+                    .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                    .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+                )
+                .attr("y1", d => {
+                    if(d[1].maxCount < d[1].maxVertLine){
+                        return y(d[1].maxCount)
+                    }
+                    return(y(d[1].maxVertLine))})
+                .attr("y2", d => {
+                    if(d[1].maxCount < d[1].maxVertLine){
+                        return y(d[1].maxCount)
+                    }
+                    return(y(d[1].maxVertLine))})
+                .attr("stroke", "black"),
+            update => update.call(update => update.transition(transition).delay(stagger)
+                .attr("y1", d => {
+                    if(d[1].maxCount < d[1].maxVertLine){
+                        return y(d[1].maxCount)
+                    }
+                    return(y(d[1].maxVertLine))})
+                .attr("y2", d => {
+                    if(d[1].maxCount < d[1].maxVertLine){
+                        return y(d[1].maxCount)
+                    }
+                    return(y(d[1].maxVertLine))})
+                .attr("x1", d => {return(x(d[0])-boxWidth/2) })
+                .attr("x2", d => {return(x(d[0])+boxWidth/2) })
+            )
+        )
     }
     
     // Compute the data needed for the box plot
@@ -299,94 +421,40 @@ const makeDayView = (data) => {
                     maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount, outliers: outliers})
             }, d => d.hour).sort(d3.ascending)
     }
-    
-    // Create customized toggle buttons for the weather codes
-    const makeWeatherToggles = (data) => {
-        // List of all unique weathers currently in the data
-        // This is basically a copy-paste from the weather stacks function
-        // TODO: Refactor to be more DRY
-        const weathers = d3.sort(
-                        d3.rollups(data, v => v.length, d => d.weather_code),
-                        (a, b) => d3.descending(a[1], b[1])
-                    ).map(w => w[0])
 
-        // Convenience object for translating ID's to weather names
-        const weatherNames = {
-            1: "Clear sky",
-            2: "Few clouds",
-            3: "Shifting clouds",
-            4: "Cloudy",
-            7: "Rain",
-            10: "Thunder",
-            26: "Snow"
-        }
-
-        // Append weather elements as classed divs with '.checked' indicating
-        // the weather has been selected and should be displayed 
-        d3.select('#weather-container').selectAll('.weather')
-            .data(weathers, d => d)
-            .join(
-                enter => enter
-                    .append('div')
-                    .classed('checked weather', true)
-                    .attr('id', d => d)
-                    .style('background-color', d => weatherColor(d))
-                    .style('opacity', (d, i, nodes) => {
-                        if (nodes[i].classList.contains('checked')) {
-                            return '1.0'
-                        } else {
-                            return '0.2'
-                        }
-                    })
-                    .html(d => weatherNames[d])
-                    .on('dblclick', ({currentTarget}, d) => {
-                        console.log(d3.select(currentTarget))
-                        weatherBoxes = d3.selectAll('.weather')
-                        weatherBoxes.classed('checked', wd => wd == d)
-                        update()
-                    })
-                    .on('click', ({currentTarget}) => {
-                        // Toggle the checked class on the target
-                        const clicked = d3.select(currentTarget) 
-                        const status = clicked.classed('checked')
-                        clicked.classed('checked', !status)
-                        // Update visualizations
-                        update()
-                    }),
-                update => update
-                    .style('opacity', (d, i, nodes) => {
-                        if (nodes[i].classList.contains('checked')) {
-                            return '1.0'
-                        } else {
-                            return '0.2'
-                        }
-                    })
-            )
+    // Predicate generators for filtering
+    const weatherFilter = () => {
+        const weathers = d3.selectAll('.weather.checked').nodes().map(c => +c.id)
+        return (data) => 
+            weathers.includes(data.weather_code)
     }
-
-    // Takes a dataset and a filter objects filters the data with the filter. This function can take already filtered data and apply another filter to it.
-    const applyFilter = (data) => {
-        const weatherBoxes = d3.selectAll('.weather.checked').nodes()
-        const weathers = weatherBoxes.map(w => +w.id)
-
+    const dayPropertyFilter = () => {
         const dayPropBoxes = d3.selectAll('.dayProp').nodes()
         const dayProps = dayPropBoxes.map(d => d.checked)
-
-        return data.filter(d => weathers.includes(d.weather_code) &&
-                                ((d.is_holiday  && dayProps[2])   ||
-                                 (d.is_weekend  && dayProps[1])   ||
-                                 (!d.is_weekend && dayProps[0])))
+        return (data) =>
+                ((data.is_holiday  && dayProps[2])   ||
+                 (data.is_weekend  && dayProps[1])   ||
+                 (!data.is_weekend && dayProps[0]))
     }
 
 
     // Updates all visualizations with potentially new filters
     const update = () => {
-        makeWeatherToggles(focusedData)
-        const filteredData = applyFilter(focusedData)
-        const summary = computeSummary(filteredData)
-        drawBoxes(summary)
-        // drawOutliers(summary.map( d => d[1].outliers).reduce( (acc, curr) => acc.concat(curr)))
-        drawWeatherBar(computeWeatherStacks(filteredData))
+        const df = dayPropertyFilter()
+        const wf = weatherFilter()
+
+        const soloed = d3.selectAll('.solo').nodes().map(s => +s.id)
+        const sf = (data) => soloed.includes(data.weather_code)
+
+        const filteredByDayProp = focusedData.filter(df)
+        const weatherStacks = computeWeatherStacks(filteredByDayProp)
+        drawWeatherBar(weatherStacks, wf)
+
+        const combined = {id: 'combined', summary: computeSummary(filteredByDayProp.filter((d) => wf(d) && !sf(d)))}
+        const soloedSummaries = soloed.map(s => ({id: s, summary: computeSummary(filteredByDayProp.filter(d => d.weather_code == s))}))
+
+        summaries = combined.summary.length != 0 ? [combined, ...soloedSummaries] : soloedSummaries
+        drawBoxes(summaries)
     }
 
     // Updates the filter when a checkbox is changed
