@@ -62,3 +62,13 @@ svg {
 #day-view {
     height: 65%;
 }
+
+#weather-container {
+    height: 40%;
+    display: flex;
+    flex-direction: column;
+}
+
+#weather-bar {
+    height: 100%;
+}
