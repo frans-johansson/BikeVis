@@ -1,4 +1,4 @@
-const makeTimelineFocus = (week_data, dayData) => {
+const makeTimelineFocus = (dayData) => {
     let svg = d3.select('#timeline-focus')
         .append('svg')
 
@@ -16,27 +16,50 @@ const makeTimelineFocus = (week_data, dayData) => {
     let x = d3.scaleTime()
         .domain(d3.extent(dayData, d => d.timestamp))
         .range([margin.left, width - margin.right])
-    const y = d3.scaleLinear()
+    const yLeft = d3.scaleLinear()
         .domain([0, d3.max(dayData, d => d.sum_count + 10000)])
+        .range([height - margin.bottom, margin.top])
+    const yRight = d3.scaleLinear()
+        .domain([0, d3.max(dayData, d => d.mean_temp + 20)])
         .range([height - margin.bottom, margin.top])
 
     const xAxis = g => g
         .attr('transform', `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(x))
-    const yAxis = g => g
+    const yAxisLeft = g => g
         .attr('transform', `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y))
+        .call(d3.axisLeft(yLeft))
+    const yAxisRight = g => g
+        .attr('transform', `translate(${width - margin.right},0)`)
+        .call(d3.axisRight(yRight))
 
     const line = d3.line()
         .x(d => x(d.timestamp))
-        .y(d => y(d.sum_count))
+        .y(d => yLeft(d.sum_count))
+    const tempLine = d3.line()
+        .x(d => x(d.timestamp))
+        .y(d => yRight(d.mean_temp))
+    const tempArea = d3.area()
+        .x(d => x(d.timestamp))
+        .y1(d => yRight(d.mean_temp))
+        .y0(yRight(0))
 
     svg.append('g')
         .attr("class", "x-axis")
         .call(xAxis);
     svg.append('g')
-        .attr("class", "y-axis")
-        .call(yAxis);
+        .attr("class", "y-axisLeft")
+        .call(yAxisLeft);
+    svg.append('g')
+        .attr("class", "y-axisRight")
+        .call(yAxisRight)
+    svg.append("path")
+        .datum(dayData)
+        .attr("clip-path", "url(#clip)")
+        .attr("class", "focus-area")
+        .attr("fill", "DarkOrange")
+        .attr("opacity", .5)
+        .attr("d", tempArea);
     svg.append("path")
         .datum(dayData)
         .attr("fill", "none")
@@ -46,13 +69,120 @@ const makeTimelineFocus = (week_data, dayData) => {
         .attr("stroke-linecap", "round")
         .attr("clip-path", "url(#clip)")
         .attr("class", "focus-path")
-        .attr("d", line);
+        .attr("d", line)
+        
+    // Makes the popup rectangle fit in the SVG
+    const popupOrientation = x => {
+        if(x > width / 2){
+            return x-190
+        }
+        return x
+    }
+    const formatTime = d3.timeFormat("%B %d, %Y")
+    
+    const popupDots = svg.append('g')
+        .attr('class', 'popup-dots')
+        .attr('fill', 'none')
+        .attr('pointer-events', 'all')
+    popupDots.selectAll('.popupDot')
+    .data(dayData)
+    .join(
+        enter => enter.append('circle')
+            .attr('class', 'popupDot')
+            .attr('r', 6)
+            .attr('cx', d => x(d.timestamp))
+            .attr('cy', d => yLeft(d.sum_count))
+            .attr('transform', `translate(${0},${2})`)
+            .attr('d', d => d)
+            .on('mouseover', ({ currentTarget }, d) => {
+                d3.select(currentTarget).style('fill', 'steelblue')
+                const g = svg.append("g")
+                g.append("rect")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value))
+                    .attr("y", currentTarget.cy.animVal.value - 78)
+                    .attr("width", 190)
+                    .attr("height", 78)
+                    .attr("rx", 5)
+                    .attr("fill", "AliceBlue")
+                    .attr("stroke", "black")
+                    .attr("id", "popupRect")
+                g.append("text")
+                    .attr("class", "popupText")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
+                    .attr("y", currentTarget.cy.animVal.value - 64)
+                    .attr("font-size", "0.9em")
+                    .text(`Date: ${formatTime(d.timestamp)}`)
+                g.append("text")
+                    .attr("class", "popupText")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
+                    .attr("y", currentTarget.cy.animVal.value - 49)
+                    .attr("font-size", "0.9em")
+                    .text(`Bikes rented: ${d.sum_count}`)
+                g.append("text")
+                    .attr("class", "popupText")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
+                    .attr("y", currentTarget.cy.animVal.value - 34)
+                    .attr("font-size", "0.9em")
+                    .text(`Mean temperature: ${d.mean_temp.toFixed(2)} °C`)
+                g.append("text")
+                    .attr("class", "popupText")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
+                    .attr("y", currentTarget.cy.animVal.value - 19)
+                    .attr("font-size", "0.9em")
+                    .text(`Mean humidity: ${d.mean_humidity.toFixed(2)} %rh`)
+                g.append("text")
+                    .attr("class", "popupText")
+                    .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
+                    .attr("y", currentTarget.cy.animVal.value - 4)
+                    .attr("font-size", "0.9em")
+                    .text(`Mean wind speed: ${d.mean_wind_speed.toFixed()} m/s`)
+            })
+            .on('mouseout', ({ currentTarget }) => { 
+                d3.select(currentTarget).style('fill', 'none')
+                d3.select('#popupRect').remove()
+                d3.selectAll('.popupText').remove()
+            })
+    )
+    
+    
+    // Change axis colors
+    svg.select('.y-axisLeft')
+        .select("path")
+        .style("stroke", "steelblue")
+    svg.select('.y-axisLeft')
+        .selectAll(".tick")
+            .select("line")
+            .style("stroke", "steelblue")
+    svg.select('.y-axisLeft')
+        .selectAll(".tick")
+            .select("text")
+            .style("fill", "SlateBlue")
+        
+    svg.select('.y-axisRight')
+        .select("path")
+        .style("stroke", "DarkOrange")
+    svg.select('.y-axisRight')
+        .selectAll(".tick")
+            .select("line")
+            .style("stroke", "DarkOrange")
+    svg.select('.y-axisRight')
+        .selectAll(".tick")
+            .select("text")
+            .style("fill", "OrangeRed")
+
 
     return ([xMin, xMax]) => {
         x.domain([xMin, xMax])
-        y.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.sum_count + 10000 : null)])
+        // yLeft.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.sum_count + 10000 : null)])
         svg.select('.focus-path').attr("d", line)
         svg.select('.x-axis').call(xAxis)
-        svg.select('.y-axis').call(yAxis)
+        // svg.select('.y-axisLeft').call(yAxisLeft)
+        // yRight.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.mean_temp: null)])
+        svg.select('.focus-temp-path').attr("d", tempLine)
+        // svg.select('.y-axisRight').call(yAxisRight)
+        svg.select('.focus-area').attr("d", tempArea)
+        svg.selectAll('.popupDot')
+            .attr('cx', d => x(d.timestamp))
+            .attr('cy', d => yLeft(d.sum_count))
     }
 }
