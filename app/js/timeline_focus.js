@@ -3,7 +3,7 @@ const makeTimelineFocus = (dayData) => {
         .append('svg')
 
     const { width, height } = svg.node().getBoundingClientRect()
-    const margin = ({ top: 20, right: 20, bottom: 50, left: 50 })
+    const margin = ({ top: 20, right: 40, bottom: 40, left: 60 })
 
     svg.append("defs").append("clipPath")
         .attr("id", "clip")
@@ -70,7 +70,7 @@ const makeTimelineFocus = (dayData) => {
         .attr("clip-path", "url(#clip)")
         .attr("class", "focus-path")
         .attr("d", line)
-        
+   
     // Makes the popup rectangle fit in the SVG
     const popupOrientation = x => {
         if(x > width / 2){
@@ -117,7 +117,7 @@ const makeTimelineFocus = (dayData) => {
                     .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
                     .attr("y", currentTarget.cy.animVal.value - 49)
                     .attr("font-size", "0.9em")
-                    .text(`Bikes rented: ${d.sum_count}`)
+                    .text(`No. bikes rented: ${d.sum_count}`)
                 g.append("text")
                     .attr("class", "popupText")
                     .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
@@ -156,7 +156,7 @@ const makeTimelineFocus = (dayData) => {
     svg.select('.y-axisLeft')
         .selectAll(".tick")
             .select("text")
-            .style("fill", "SlateBlue")
+            .style("fill", "steelblue")
         
     svg.select('.y-axisRight')
         .select("path")
@@ -168,18 +168,39 @@ const makeTimelineFocus = (dayData) => {
     svg.select('.y-axisRight')
         .selectAll(".tick")
             .select("text")
-            .style("fill", "OrangeRed")
+            .style("fill", "DarkOrange")
+
+    // Axis labels
+    svg.select('.x-axis').append("text")
+        .attr("x", width/2)
+        .attr("y", margin.bottom)
+        .style("font-size", "20px")
+        .style("fill", "black")
+        .style("text-anchor", "middle")
+        .text("Date")
+    svg.select('.y-axisLeft').append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -(height-margin.top-margin.bottom)/2)
+        .attr("y", -margin.left + 15)
+        .style("font-size", "20px")
+        .style("fill", "black")
+        .style("text-anchor", "middle")
+        .text(" No. bikes rented")
+    svg.select('.y-axisRight').append("text")
+        .attr("transform", "rotate(90)")
+        .attr("x", (height-margin.top-margin.bottom)/2)
+        .attr("y", -margin.right + 15)
+        .style("font-size", "20px")
+        .style("fill", "black")
+        .style("text-anchor", "middle")
+        .text("Mean temperature (°C)")
 
 
     return ([xMin, xMax]) => {
         x.domain([xMin, xMax])
-        // yLeft.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.sum_count + 10000 : null)])
         svg.select('.focus-path').attr("d", line)
         svg.select('.x-axis').call(xAxis)
-        // svg.select('.y-axisLeft').call(yAxisLeft)
-        // yRight.domain([0, d3.max(dayData, d => xMin <= d.timestamp && d.timestamp <= xMax ? d.mean_temp: null)])
         svg.select('.focus-temp-path').attr("d", tempLine)
-        // svg.select('.y-axisRight').call(yAxisRight)
         svg.select('.focus-area').attr("d", tempArea)
         svg.selectAll('.popupDot')
             .attr('cx', d => x(d.timestamp))

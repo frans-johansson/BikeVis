@@ -11,7 +11,7 @@ const makeDayView = (data) => {
 
     // Sizing parameters
     const { width, height } = svg.node().getBoundingClientRect()
-    const margin = ({ top: 10, right: 10, bottom: 45, left: 40 })
+    const margin = ({ top: 10, right: 50, bottom: 45, left: 40 })
 
     const x = d3.scaleBand()
         .domain(hourData.map(d => d.hour))
@@ -27,19 +27,38 @@ const makeDayView = (data) => {
         .domain([0, hourData.length])
         .range([0.2, 0.05])
 
-    // Axes
+    // Axis
     const xAxis = g => g
+        .attr("class", "x-axis")   
         .attr('transform', `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(x))
 
     const yAxis = g => g
-        .attr('transform', `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y))
+        .attr("class", "y-axis")
+        .attr('transform', `translate(${width - margin.right},0)`)
+        .call(d3.axisRight(y))
 
     svg.append('g')
         .call(xAxis);
     svg.append('g')
         .call(yAxis);
+
+    // Axis label
+    svg.select('.x-axis').append("text")
+        .attr("x", width/2)
+        .attr("y", margin.bottom - 5)
+        .style("font-size", "15px")
+        .style("fill", "black")
+        .style("text-anchor", "middle")
+        .text("Timestamp (h)")
+    svg.select('.y-axis').append("text")
+        .attr("transform", "rotate(90)")
+        .attr("x", (height-margin.top-margin.bottom)/2)
+        .attr("y", -margin.right + 10)
+        .style("font-size", "15px")
+        .style("fill", "black")
+        .style("text-anchor", "middle")
+        .text(" No. bikes rented")
     
     // Attatch the weather bar
     const weatherSvg = d3.select('#weather-bar').append('svg')
