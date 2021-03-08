@@ -11,7 +11,7 @@ const makeDayView = (data) => {
 
     // Sizing parameters
     const { width, height } = svg.node().getBoundingClientRect()
-    const margin = ({ top: 10, right: 50, bottom: 45, left: 40 })
+    const margin = ({ top: 10, right: 50, bottom: 45, left: 0 })
 
     const x = d3.scaleBand()
         .domain(hourData.map(d => d.hour))
@@ -46,18 +46,20 @@ const makeDayView = (data) => {
     // Axis label
     svg.select('.x-axis').append("text")
         .attr("x", width/2)
-        .attr("y", margin.bottom - 5)
-        .style("font-size", "15px")
+        .attr("y", margin.bottom - 15)
+        .style("font-size", "12")
         .style("fill", "black")
         .style("text-anchor", "middle")
-        .text("Timestamp (h)")
+        .style("font-weight", "bold")
+        .text("Hour")
     svg.select('.y-axis').append("text")
         .attr("transform", "rotate(90)")
         .attr("x", (height-margin.top-margin.bottom)/2)
         .attr("y", -margin.right + 10)
-        .style("font-size", "15px")
+        .style("font-size", "12px")
         .style("fill", "black")
         .style("text-anchor", "middle")
+        .style("font-weight", "bold")
         .text(" No. bikes rented")
     
     // Attatch the weather bar
@@ -155,12 +157,12 @@ const makeDayView = (data) => {
                 enter => enter.append('g')
                     .call(initWeatherBars)
                     .call(enter => enter.transition(transition)
-                        .attr('transform', d => `translate(${margin.left}, ${weatherY(d.weather_code)})`)
+                        .attr('transform', d => `translate(${40}, ${weatherY(d.weather_code)})`)
                     ),
                 update => update
                     .attr('id', d => d.weather_code)
                     .call(update => update.transition(transition)
-                        .attr('transform', d => `translate(${margin.left}, ${weatherY(d.weather_code)})`)
+                        .attr('transform', d => `translate(${40}, ${weatherY(d.weather_code)})`)
                         .attr('opacity', (d, i, nodes) => {
                             if (nodes[i].classList.contains('checked')) {
                                 return '1.0'
@@ -212,7 +214,7 @@ const makeDayView = (data) => {
             .join('circle')
                 .attr('cy', 5)
                 .attr('r', 5)
-                .attr('cx', -margin.left+8)
+                .attr('cx', -32)
                 .attr('class', 'solo-toggle')
                 .on('click', (e) => {
                     e.stopPropagation()

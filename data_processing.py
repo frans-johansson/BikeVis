@@ -28,6 +28,12 @@ if __name__ == '__main__':
         week_model = week['count'].groupby(week.index.time).median()
         P += [pearson_coeff(week_model, season_model)]
 
+
+    f = 20
+    P = np.array(P)**f
+    P = (P - P.min())/(P.max() - P.min())
+    P = np.round(P*10).astype('int')
+
     week_df = pd.read_csv('app/data/week_data.csv')
     week_df['pearson'] = P
     week_df.to_csv('app/data/week_data.csv')

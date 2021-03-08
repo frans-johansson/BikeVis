@@ -5,23 +5,30 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
-    <title>Example App</title>
+    <title>BikeVis</title>
 </head>
 
 <body>
     <h1>BikeVis</h1>
     <div id="timeline-overview">
-        <input type="range" name="outlierSensitivity" id="outlier-sensitivity"
-               min=0.0 max=1.0 step=0.001 value=0.9>
-        <label for="#outlier-sensitivity">Outlier sensitivity</label>
+    </div>
+    <div id="outlier-wrapper">
+        <span>Outlier sensitivity level</span>
+    <!-- <input type="range" name="outlierSensitivity" id="outlier-sensitivity"
+            min=0 max=10 step=1 value=5>
+    <label for="#outlier-sensitivity">Outlier sensitivity</label> -->
     </div>
     <div id="focus" class='container'>
         <div id="timeline-focus">
             <h2>Timeline view</h2>
+            <p>Bike rentals and temperature trends for the selected time period</p>
         </div>
         <div id="day-focus">
             <h2>24-hour view</h2>
+            <p>Bike rental distribution by time of day for the selected time period</p>
             <div>
                 <span>Showing: </span>
                 <input type="checkbox" class="filter dayProp" id="weekday" checked>
@@ -35,7 +42,7 @@
             </div>
             <div id="weather-container">
                 <h3>Weather</h3>
-                <p>Filter and single out weather conditions in the 24-hour view</p>
+                <p>Distribution of weather conditions for the selected time period. Filter out weather conditions in the 24-hour view by clicking on the bars. Use the circles to toggle showing separate distributions for the weather conditions.</p>
                 <div id="weather-bar"></div>
             </div>
         </div>
@@ -43,6 +50,7 @@
 
     <!-- Include scripts -->
     <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider"></script>
     <script src="js/timeline_focus.js"></script>
     <script src="js/timeline_overview.js"></script>
     <script src="js/day_view.js"></script>
