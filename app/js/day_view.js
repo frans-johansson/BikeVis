@@ -27,7 +27,7 @@ const makeDayView = (data) => {
         .domain([0, hourData.length])
         .range([0.2, 0.05])
 
-    // Axis
+    // Axes
     const xAxis = g => g
         .attr("class", "x-axis")   
         .attr('transform', `translate(0,${height - margin.bottom})`)
@@ -43,7 +43,7 @@ const makeDayView = (data) => {
     svg.append('g')
         .call(yAxis);
 
-    // Axis label
+    // Axes labels
     svg.select('.x-axis').append("text")
         .attr("x", width/2)
         .attr("y", margin.bottom - 15)
@@ -422,6 +422,8 @@ const makeDayView = (data) => {
     }
     
     // Compute the data needed for the box plot
+    // This function is a modified and extended version to work with our data and with d3 V6 of this source:
+    // https://www.d3-graph-gallery.com/graph/boxplot_several_groups.html
     const computeSummary = (data) => {
         return d3.rollups(data, v => {
             q1 = d3.quantile(v.map( h => { return h.count}).sort(d3.ascending),.25)
@@ -433,10 +435,11 @@ const makeDayView = (data) => {
             minCount = d3.min(v.map( h => { return h.count}))
             maxCount = d3.max(v.map( h => { return h.count}))
             outliers = []
-            
-            if(minCount < minVertLine || maxCount > maxVertLine){
-                outliers = v.filter( d => d.count < minVertLine || d.count > maxVertLine)
-            }
+
+            // Outliers are not rendered with the box plots in the final version. However, this code works.
+            // if(minCount < minVertLine || maxCount > maxVertLine){
+            //     outliers = v.filter( d => d.count < minVertLine || d.count > maxVertLine)
+            // }
             
             return({q1: q1, median: median, q3: q3, interQuantileRange: interQuantileRange, minVertLine: minVertLine,
                     maxVertLine: maxVertLine, minCount: minCount, maxCount: maxCount, outliers: outliers})

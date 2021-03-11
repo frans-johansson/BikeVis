@@ -33,17 +33,14 @@ const makeTimelineFocus = (dayData) => {
         .attr('transform', `translate(${width - margin.right},0)`)
         .call(d3.axisRight(yRight))
 
+    // Draws the line- and area graphs.
     const line = d3.line()
         .x(d => x(d.timestamp))
         .y(d => yLeft(d.sum_count))
-    const tempLine = d3.line()
-        .x(d => x(d.timestamp))
-        .y(d => yRight(d.mean_temp))
     const tempArea = d3.area()
         .x(d => x(d.timestamp))
         .y1(d => yRight(d.mean_temp))
         .y0(yRight(0))
-
     svg.append('g')
         .attr("class", "x-axis")
         .call(xAxis);
@@ -71,19 +68,19 @@ const makeTimelineFocus = (dayData) => {
         .attr("class", "focus-path")
         .attr("d", line)
    
-    // Makes the popup rectangle fit in the SVG
+    
+    // Draws a invisible dot at each datum in the line graph. Becomes visible and gives details about datum when hovered on.
+    const popupDots = svg.append('g')
+        .attr('class', 'popup-dots')
+        .attr('fill', 'none')
+        .attr('pointer-events', 'all')
+    const formatTime = d3.timeFormat("%B %d, %Y")
     const popupOrientation = x => {
         if(x > width / 2){
             return x-190
         }
         return x
     }
-    const formatTime = d3.timeFormat("%B %d, %Y")
-    
-    const popupDots = svg.append('g')
-        .attr('class', 'popup-dots')
-        .attr('fill', 'none')
-        .attr('pointer-events', 'all')
     popupDots.selectAll('.popupDot')
     .data(dayData)
     .join(
@@ -145,7 +142,7 @@ const makeTimelineFocus = (dayData) => {
     )
     
     
-    // Change axis colors
+    // Change axes colors
     svg.select('.y-axisLeft')
         .select("path")
         .style("stroke", "steelblue")
@@ -170,7 +167,7 @@ const makeTimelineFocus = (dayData) => {
             .select("text")
             .style("fill", "DarkOrange")
 
-    // Axis labels
+    // Axes labels
     svg.select('.x-axis').append("text")
         .attr("x", width/2)
         .attr("y", margin.bottom - 8)
@@ -203,7 +200,6 @@ const makeTimelineFocus = (dayData) => {
         x.domain([xMin, xMax])
         svg.select('.focus-path').attr("d", line)
         svg.select('.x-axis').call(xAxis)
-        svg.select('.focus-temp-path').attr("d", tempLine)
         svg.select('.focus-area').attr("d", tempArea)
         svg.selectAll('.popupDot')
             .attr('cx', d => x(d.timestamp))
