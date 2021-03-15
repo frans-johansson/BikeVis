@@ -132,7 +132,7 @@ const makeTimelineFocus = (dayData) => {
                     .attr("x", x => x = popupOrientation(currentTarget.cx.animVal.value) + 2)
                     .attr("y", currentTarget.cy.animVal.value - 4)
                     .attr("font-size", "0.9em")
-                    .text(`Mean wind speed: ${d.mean_wind_speed.toFixed()} m/s`)
+                    .text(`Mean wind speed: ${d.mean_wind_speed.toFixed()} km/h`)
             })
             .on('mouseout', ({ currentTarget }) => { 
                 d3.select(currentTarget).style('fill', 'none')
